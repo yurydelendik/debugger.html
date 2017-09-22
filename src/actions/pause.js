@@ -79,7 +79,7 @@ export function paused(pauseInfo: Pause) {
   return async function({ dispatch, getState, client, sourceMaps }: ThunkArgs) {
     let { frames, why, loadedObjects } = pauseInfo;
 
-    frames = await updateFrameLocations(frames, sourceMaps);
+    frames = await updateFrameLocations(frames, getState, sourceMaps);
     const frame = frames[0];
 
     const scopes = await client.getFrameScopes(frame);
@@ -281,7 +281,11 @@ export function astCommand(stepType: string) {
     const pauseInfo = getPause(getState());
     const source = getSelectedSource(getState()).toJS();
 
-    const pausedPosition = await getPausedPosition(pauseInfo, sourceMaps);
+    const pausedPosition = await getPausedPosition(
+      pauseInfo,
+      setState,
+      sourceMaps
+    );
 
     if (stepType == "stepOver") {
       const nextLocation = await parser.getNextStep(source, pausedPosition);

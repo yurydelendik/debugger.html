@@ -6,7 +6,10 @@ import {
   assertLocation
 } from "../../utils/breakpoint";
 import { getSource } from "../../selectors";
-import { getGeneratedLocation } from "../../utils/source-maps";
+import {
+  getGeneratedLocation,
+  getOriginalLocation
+} from "../../utils/source-maps";
 
 export default async function addBreakpoint(
   getState,
@@ -42,8 +45,10 @@ export default async function addBreakpoint(
   );
 
   const newGeneratedLocation = actualLocation || generatedLocation;
-  const newLocation = await sourceMaps.getOriginalLocation(
-    newGeneratedLocation
+  const newLocation = await getOriginalLocation(
+    sourceRecord,
+    newGeneratedLocation,
+    sourceMaps
   );
 
   const astLocation = await getASTLocation(sourceRecord, location);

@@ -6,7 +6,10 @@ import {
   findScopeByName
 } from "../../utils/breakpoint";
 
-import { getGeneratedLocation } from "../../utils/source-maps";
+import {
+  getGeneratedLocation,
+  getOriginalLocation
+} from "../../utils/source-maps";
 import { originalToGeneratedId } from "devtools-source-map";
 import { getSource } from "../../selectors";
 
@@ -111,8 +114,10 @@ export async function syncClientBreakpoint(
   // the breakpoint might have slid server side, so we want to get the location
   // based on the server's return value
   const newGeneratedLocation = clientBreakpoint.actualLocation;
-  const newLocation = await sourceMaps.getOriginalLocation(
-    newGeneratedLocation
+  const newLocation = await getOriginalLocation(
+    source,
+    newGeneratedLocation,
+    sourceMaps
   );
 
   return createSyncData(

@@ -18,7 +18,7 @@ export function createPrettySource(sourceId) {
 
     let frames = getFrames(getState());
     if (frames) {
-      frames = await updateFrameLocations(frames, sourceMaps);
+      frames = await updateFrameLocations(frames, getState, sourceMaps);
     }
 
     const prettySource = {

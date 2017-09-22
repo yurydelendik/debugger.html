@@ -1,6 +1,7 @@
 // @flow
 import { PROMISE } from "../../utils/redux/middleware/promise";
 import { setEmptyLines, setSymbols } from "../ast";
+import { getWasmPart } from "../../utils/wasm";
 import type { Source } from "../../types";
 import type { ThunkArgs } from "../types";
 /**
@@ -18,6 +19,20 @@ export function loadSourceText(source: Source) {
       type: "LOAD_SOURCE_TEXT",
       source: source,
       [PROMISE]: (async function() {
+        if (source.fakeOf) {
+          const { source: { binary } } = await client.sourceContents(
+            source.fakeOf
+          );
+          var m = /\/([^\/]+)$/.exec(source.url);
+          const text = getWasmPart(source.id, source.range, binary);
+
+          return {
+            id: source.id,
+            text,
+            contentType: "text/javascript"
+          };
+        }
+
         if (sourceMaps.isOriginalId(source.id)) {
           return await sourceMaps.getOriginalSourceText(source);
         }

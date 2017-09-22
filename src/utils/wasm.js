@@ -1,6 +1,10 @@
 /* @flow */
 
-import { BinaryReader } from "wasmparser/dist/WasmParser";
+import {
+  BinaryReader,
+  BinaryReaderState,
+  ExternalKind
+} from "wasmparser/dist/WasmParser";
 import { WasmDisassembler } from "wasmparser/dist/WasmDis";
 
 type WasmState = {
@@ -34,6 +38,105 @@ function getWasmText(sourceId: string, data: Uint8Array) {
   wasmStates[sourceId] = { offsets, lines };
 
   return { lines: result.lines, done: result.done };
+}
+
+function stringToBinary(binary: string): Uint8Array {
+  const data = new Uint8Array(binary.length);
+  for (let i = 0; i < data.length; i++) {
+    data[i] = binary.charCodeAt(i);
+  }
+  return data;
+}
+
+function getWasmFunctionsIndex(
+  binary: string
+): Array<{ id: string, start: number, end: number }> {
+  const data = stringToBinary(binary);
+  const parser = new BinaryReader();
+  parser.setData(data.buffer, 0, data.length);
+  const index = [];
+  let first = 0;
+  let count = 0;
+  let lastPosition = 0;
+  l1: while (parser.read()) {
+    switch (parser.state) {
+      case BinaryReaderState.IMPORT_SECTION_ENTRY:
+        if (parser.result.kind === ExternalKind.Function) {
+          first++;
+        }
+        break;
+      case BinaryReaderState.BEGIN_FUNCTION_BODY:
+        index.push({
+          id: `func${first + count}`,
+          start: lastPosition,
+          end: lastPosition
+        });
+        parser.skipFunctionBody();
+        break;
+      case BinaryReaderState.END_FUNCTION_BODY:
+        count++;
+        index[index.length - 1].end = parser.position;
+        break;
+      case BinaryReaderState.END_WASM:
+      case BinaryReaderState.ERROR:
+        break l1;
+      // TODO case NAME_SECTION_ENTRY
+    }
+    lastPosition = parser.position;
+  }
+  return index;
+}
+
+function getWasmPart(sourceId: string, part: any, binary: string): string {
+  const data = stringToBinary(binary);
+  const parser = new BinaryReader();
+  parser.setData(data.buffer, 0, data.length);
+  const dis = new WasmDisassembler();
+  dis.addOffsets = true;
+  const done = dis.disassembleChunk(parser);
+  let result = dis.getResult();
+  if (result.lines.length === 0) {
+    result = { lines: ["No luck with wast conversion"], offsets: [0], done };
+  }
+
+  let textLines = [],
+    offsets = [];
+  if (!Array.isArray(part)) {
+    for (let i = 0; i < result.lines.length; i++) {
+      if (
+        (result.offsets[i] >= part.start && result.offsets[i] < part.end) ||
+        (result.offsets[i] == part.end && result.offsets[i - 1] != part.end)
+      ) {
+        textLines.push(result.lines[i]);
+        offsets.push(result.offsets[i]);
+      }
+    }
+  } else {
+    const excludeStart = part.reduce(function(acc, value) {
+      return Math.min(acc, value.start);
+    }, Infinity);
+    const excludeEnd = part.reduce(function(acc, value) {
+      return Math.max(acc, value.end);
+    }, 0);
+    for (let i = 0; i < result.lines.length; i++) {
+      if (
+        (result.offsets[i] < excludeStart || result.offsets[i] >= excludeEnd) &&
+        (result.offsets[i] != excludeEnd || result.offsets[i - 1] == excludeEnd)
+      ) {
+        textLines.push(result.lines[i]);
+        offsets.push(result.offsets[i]);
+      }
+    }
+  }
+
+  const lines = [];
+  for (let i = 0; i < offsets.length; i++) {
+    lines[offsets[i]] = i;
+  }
+
+  wasmStates[sourceId] = { offsets, lines };
+
+  return textLines.join("\n");
 }
 
 /**
@@ -133,6 +236,8 @@ function renderWasmText(sourceId: string, { binary }: Object) {
 
 export {
   getWasmText,
+  getWasmFunctionsIndex,
+  getWasmPart,
   getWasmLineNumberFormatter,
   isWasm,
   lineToWasmOffset,

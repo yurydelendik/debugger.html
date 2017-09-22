@@ -27,6 +27,8 @@ import { removeDocument } from "../utils/editor";
 import { isThirdParty } from "../utils/source";
 import { getGeneratedLocation } from "../utils/source-maps";
 import * as parser from "../utils/parser";
+import { getWasmFunctionsIndex } from "../utils/wasm";
+import { getOriginalLocation } from "../utils/source-maps";
 
 import {
   getSource,
@@ -103,6 +105,10 @@ export function newSource(source: Source) {
       await dispatch(loadSourceMap(source));
     }
 
+    if (source.isWasm) {
+      await dispatch(loadWasmParts(source));
+    }
+
     await checkSelectedSource(getState(), dispatch, source);
     await checkPendingBreakpoints(getState(), dispatch, source);
   };
@@ -117,6 +123,60 @@ export function newSources(sources: Source[]) {
     for (const source of filteredSources) {
       await dispatch(newSource(source));
     }
+  };
+}
+
+function loadWasmParts(generatedSource) {
+  return async function({ dispatch, getState, sourceMaps }: ThunkArgs) {
+    const state = getState();
+
+    const { url } = generatedSource;
+
+    await dispatch(loadSourceText(generatedSource));
+
+    const _source = getSource(getState(), generatedSource.id);
+    const { text: { binary } } = _source.toJS();
+    const index = getWasmFunctionsIndex(binary);
+
+    const originalSources = [
+      {
+        url: url + "?parts/",
+        id: sourceMaps.generatedToOriginalId(
+          generatedSource.id,
+          url + "?parts/"
+        ),
+        isPrettyPrinted: false,
+        isWasm: false,
+        isBlackBoxed: false,
+        fakeOf: generatedSource.id,
+        range: index,
+        loadedState: "unloaded"
+      }
+    ].concat(
+      index.map(
+        entry =>
+          ({
+            url: url + "?parts/" + entry.id,
+            id: sourceMaps.generatedToOriginalId(
+              generatedSource.id,
+              url + "?parts/" + entry.id
+            ),
+            isPrettyPrinted: false,
+            isWasm: false,
+            isBlackBoxed: false,
+            fakeOf: generatedSource.id,
+            range: entry,
+            loadedState: "unloaded"
+          }: Source)
+      )
+    );
+
+    dispatch({ type: "ADD_SOURCES", sources: originalSources });
+
+    originalSources.forEach(source => {
+      checkSelectedSource(state, dispatch, source);
+      checkPendingBreakpoints(state, dispatch, source);
+    });
   };
 }
 
@@ -242,9 +302,10 @@ export function jumpToMappedLocation(sourceLocation: any) {
         sourceMaps
       );
     } else {
-      pairedLocation = await sourceMaps.getOriginalLocation(
+      pairedLocation = await getOriginalLocation(
+        source.toJS(),
         sourceLocation,
-        source.toJS()
+        sourceMaps
       );
     }
 
@@ -333,7 +394,7 @@ export function togglePrettyPrint(sourceId: string) {
 
     const selectedLocation = getSelectedLocation(getState());
     const selectedOriginalLocation = selectedLocation
-      ? await sourceMaps.getOriginalLocation(selectedLocation)
+      ? await getOriginalLocation(source, selectedLocation, sourceMaps)
       : {};
 
     const url = getPrettySourceURL(source.url);

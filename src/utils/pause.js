@@ -1,9 +1,12 @@
 // @flow
 import type { Pause, Frame } from "../types";
 import { get } from "lodash";
+import { getOriginalLocation } from "./source-maps";
+import { getSource } from "../selectors";
 
 export function updateFrameLocations(
   frames: Frame[],
+  getState: any,
   sourceMaps: any
 ): Promise<Frame[]> {
   if (!frames || frames.length == 0) {
@@ -12,7 +15,12 @@ export function updateFrameLocations(
 
   return Promise.all(
     frames.map(frame => {
-      return sourceMaps.getOriginalLocation(frame.location).then(loc => {
+      const source = getSource(getState(), frame.location.sourceId).toJS();
+      return getOriginalLocation(
+        source,
+        frame.location,
+        sourceMaps
+      ).then(loc => {
         return Object.assign({}, frame, {
           location: loc
         });
@@ -55,9 +63,13 @@ export function getPauseReason(pauseInfo: Pause): string | null {
   return reasons[reasonType];
 }
 
-export async function getPausedPosition(pauseInfo: Pause, sourceMaps: any) {
+export async function getPausedPosition(
+  pauseInfo: Pause,
+  getState: any,
+  sourceMaps: any
+) {
   let { frames } = pauseInfo;
-  frames = await updateFrameLocations(frames, sourceMaps);
+  frames = await updateFrameLocations(frames, getState, sourceMaps);
   const frame = frames[0];
   const { location } = frame;
   return location;
