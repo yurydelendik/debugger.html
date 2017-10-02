@@ -10,7 +10,7 @@ import {
 } from "../selectors";
 
 import { ensureParserHasSourceText } from "./sources";
-
+import { getMappedExpression } from "./expressions";
 import { PROMISE } from "../utils/redux/middleware/promise";
 import {
   getSymbols,
@@ -162,7 +162,7 @@ export function setPreview(
           const generatedSourceId = generatedLocation.sourceId;
           await dispatch(ensureParserHasSourceText(generatedSourceId));
 
-          expression = await getSourceMappedExpression(
+          expression = await getMappedExpression(
             { sourceMaps },
             generatedLocation,
             expression

@@ -8,6 +8,7 @@ import {
   getSource
 } from "../selectors";
 import { PROMISE } from "../utils/redux/middleware/promise";
+import { replaceOriginalVariableName } from "devtools-map-bindings/src/utils";
 import { ensureParserHasSourceText } from "./sources";
 import { isGeneratedId } from "devtools-source-map";
 import getSourceMappedExpression from "../utils/parser/getSourceMappedExpression";
@@ -120,7 +121,7 @@ function evaluateExpression(expression: Expression) {
         const generatedSourceId = generatedLocation.sourceId;
         await dispatch(ensureParserHasSourceText(generatedSourceId));
 
-        input = await getSourceMappedExpression(
+        input = await getMappedExpression(
           { sourceMaps },
           generatedLocation,
           input
@@ -135,4 +136,27 @@ function evaluateExpression(expression: Expression) {
       [PROMISE]: client.evaluate(wrapExpression(expression.input), { frameId })
     });
   };
+}
+
+/**
+ * Gets information about original variable names from the source map
+ * and replaces all posible generated names.
+ */
+export async function getMappedExpression(
+  { sourceMaps }: Object,
+  generatedLocation: Location,
+  expression: string
+): Promise<string> {
+  const astScopes = await parser.getScopes(generatedLocation);
+
+  const generatedScopes = await sourceMaps.getLocationScopes(
+    generatedLocation,
+    astScopes
+  );
+
+  if (!generatedScopes) {
+    return expression;
+  }
+
+  return replaceOriginalVariableName(expression, generatedScopes);
 }
