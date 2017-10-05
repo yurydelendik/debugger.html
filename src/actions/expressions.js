@@ -11,7 +11,6 @@ import { PROMISE } from "../utils/redux/middleware/promise";
 import { replaceOriginalVariableName } from "devtools-map-bindings/src/utils";
 import { ensureParserHasSourceText } from "./sources";
 import { isGeneratedId } from "devtools-source-map";
-import getSourceMappedExpression from "../utils/parser/getSourceMappedExpression";
 import { wrapExpression } from "../utils/expressions";
 import * as parser from "../workers/parser";
 import type { Expression } from "../types";

@@ -23,7 +23,6 @@ import { isGeneratedId } from "devtools-source-map";
 import type { SourceId } from "debugger-html";
 import type { ThunkArgs } from "./types";
 import type { AstLocation } from "../workers/parser";
-import getSourceMappedExpression from "../utils/parser/getSourceMappedExpression";
 
 export function setSymbols(sourceId: SourceId) {
   return async ({ dispatch, getState }: ThunkArgs) => {
