@@ -4,7 +4,7 @@
 
 // @flow
 
-import { getCurrentThread, getSource } from "../../selectors";
+import { getCurrentThread, getSelectedFrameId, getSource } from "../../selectors";
 import { loadSourceText } from "../sources/loadSourceText";
 import { PROMISE } from "../utils/middleware/promise";
 
@@ -16,6 +16,53 @@ import type { Frame, Scope } from "../../types";
 import type { ThunkArgs } from "../types";
 
 import { buildMappedScopes } from "../../utils/pause/mapScopes";
+
+import type { OriginalScope } from "../../utils/pause/mapScopes";
+
+export async function buildOriginalScopes(
+  frame: Frame,
+  client: any,
+  frameId: any,
+  thread: any
+): Promise<?{
+  mappings: {
+    [string]: string
+  },
+  scope: OriginalScope
+}> {
+  const frameBase = frame.originalVariables.frameBase;
+  const inputs = [];
+  for (let i = 0; i < frame.originalVariables.vars.length; i++) {
+    const expr = (frame.originalVariables.vars[i].expr || "void 0").replace(/\bfp\(\)/g, frameBase);
+    inputs[i] = expr;
+  }
+  const results = await client.evaluateExpressions(inputs, {
+    frameId,
+    thread
+  });
+
+  const variables = {};
+  for (let i = 0; i < frame.originalVariables.vars.length; i++) {
+    const name = frame.originalVariables.vars[i].name
+    variables[name] = { value: results[i].result };
+  }
+  const bindings = {
+    arguments: [],
+    variables,
+  };
+  const scope = {
+    type: "function",
+    actor: frame.actor,
+    bindings,
+    parent: null,
+    function: null,
+    block: null
+  };
+  return {
+    mappings: {},
+    scope,
+  };
+}
 
 export function mapScopes(scopes: Promise<Scope>, frame: Frame) {
   return async function({ dispatch, getState, client, sourceMaps }: ThunkArgs) {
@@ -31,6 +78,12 @@ export function mapScopes(scopes: Promise<Scope>, frame: Frame) {
       thread: getCurrentThread(getState()),
       frame,
       [PROMISE]: (async function() {
+        if (frame.isOriginal && frame.originalVariables) {
+          const frameId = getSelectedFrameId(getState());
+          const thread = getCurrentThread(getState());
+          return buildOriginalScopes(frame, client, frameId, thread);
+        }
+
         if (
           !features.mapScopes ||
           !source ||

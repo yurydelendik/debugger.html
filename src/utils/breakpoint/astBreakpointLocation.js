@@ -38,6 +38,8 @@ export async function findScopeByName(
   name: ?string,
   index: number
 ) {
+  if (source.isWasm) return null;
+
   const symbols = await getSymbols(source.id);
   const functions = symbols.functions;
 

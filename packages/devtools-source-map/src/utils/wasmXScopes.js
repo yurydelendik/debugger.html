@@ -6,9 +6,11 @@
 /* eslint camelcase: 0*/
 
 import type { SourceLocation, SourceId } from "debugger-html";
+import type { Expr } from "./wasmDwarfExpressions";
 
 const { getSourceMap } = require("./sourceMapRequests");
 const { generatedToOriginalId } = require("./index");
+const { decodeExpr } = require("./wasmDwarfExpressions");
 
 const xScopes = new Map();
 
@@ -67,12 +69,59 @@ function isInRange(item: XScopeItem, pc: number): boolean {
   return false;
 }
 
+type XScopeVariable = {
+  name: string,
+  expr?: Expr
+};
+
+type XScopeVariables = {
+  vars: XScopeVariable[],
+  frameBase?: Expr
+};
+
 type FoundScope = {
   id: string,
   name?: string,
+  variables: XScopeVariables,
   file?: number,
   line?: number
 };
+
+type EncodedExpr = string | Array<{
+  expr: string,
+  range: number[]
+}>;
+
+function decodeExprAt(expr: EncodedExpr, pc: number): ?Expr {
+  if (typeof expr === "string") {
+    return decodeExpr(expr);
+  }
+  const foundAt = expr.find(i => i.range[0] <= pc && pc < i.range[1]);
+  return foundAt ? decodeExpr(foundAt.expr) : null;
+}
+
+function getVariables(
+  items: XScopeItem[],
+  pc: number
+): XScopeVariables {
+  const vars = items.children ? items.children.reduce((result, item) => {
+    switch (item.tag) {
+      case "variable":
+      case "formal_parameter":
+        result.push({
+          name: item.name || "",
+          expr: item.location ? decodeExprAt(item.location, pc) : null,
+        });
+        break;
+    }
+    return result;
+  }, []) : [];
+  const frameBase = items.frame_base ? decodeExpr(items.frame_base) : null;
+  return {
+    vars,
+    frameBase
+  };
+}
 
 function filterScopes(
   items: XScopeItem[],
@@ -105,7 +154,8 @@ function filterScopes(
         if (isInRange(item, pc)) {
           const s: FoundScope = {
             id: item.linkage_name,
-            name: item.name
+            name: item.name,
+            variables: getVariables(item, pc),
           };
           result = [...result, s, ...filterScopes(item.children, pc, s, index)];
         }
@@ -115,7 +165,8 @@ function filterScopes(
           const linkedItem = index.get(item.abstract_origin);
           const s: FoundScope = {
             id: item.abstract_origin,
-            name: linkedItem ? linkedItem.name : void 0
+            name: linkedItem ? linkedItem.name : void 0,
+            variables: getVariables(item, pc),
           };
           if (lastItem) {
             lastItem.file = item.call_file;
@@ -140,6 +191,7 @@ class XScope {
     generatedLocation: SourceLocation
   ): Array<{
     displayName: string,
+    variables: XScopeVariables,
     location?: SourceLocation
   }> {
     const { code_section_offset, debug_info, sources, idIndex } = this.xScope;
@@ -150,7 +202,8 @@ class XScope {
     return scopes.map(i => {
       if (!("file" in i)) {
         return {
-          displayName: i.name || ""
+          displayName: i.name || "",
+          variables: i.variables
         };
       }
       const sourceId = generatedToOriginalId(
@@ -159,6 +212,7 @@ class XScope {
       );
       return {
         displayName: i.name || "",
+        variables: i.variables,
         location: {
           line: i.line || 0,
           sourceId

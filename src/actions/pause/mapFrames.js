@@ -144,7 +144,8 @@ async function expandFrames(
         // More fields that will be added by the mapDisplayNames and
         // updateFrameLocation.
         generatedLocation: frame.generatedLocation,
-        originalDisplayName: originalFrame.displayName
+        originalDisplayName: originalFrame.displayName,
+        originalVariables: originalFrame.variables,
       });
     });
   }
