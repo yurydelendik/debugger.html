@@ -87,10 +87,12 @@ type FoundScope = {
   line?: number
 };
 
-type EncodedExpr = string | Array<{
-  expr: string,
-  range: number[]
-}>;
+type EncodedExpr =
+  | string
+  | Array<{
+      expr: string,
+      range: number[]
+    }>;
 
 function decodeExprAt(expr: EncodedExpr, pc: number): ?Expr {
   if (typeof expr === "string") {
@@ -100,22 +102,21 @@ function decodeExprAt(expr: EncodedExpr, pc: number): ?Expr {
   return foundAt ? decodeExpr(foundAt.expr) : null;
 }
 
-function getVariables(
-  items: XScopeItem[],
-  pc: number
-): XScopeVariables {
-  const vars = items.children ? items.children.reduce((result, item) => {
-    switch (item.tag) {
-      case "variable":
-      case "formal_parameter":
-        result.push({
-          name: item.name || "",
-          expr: item.location ? decodeExprAt(item.location, pc) : null,
-        });
-        break;
-    }
-    return result;
-  }, []) : [];
+function getVariables(items: XScopeItem[], pc: number): XScopeVariables {
+  const vars = items.children
+    ? items.children.reduce((result, item) => {
+        switch (item.tag) {
+          case "variable":
+          case "formal_parameter":
+            result.push({
+              name: item.name || "",
+              expr: item.location ? decodeExprAt(item.location, pc) : null
+            });
+            break;
+        }
+        return result;
+      }, [])
+    : [];
   const frameBase = items.frame_base ? decodeExpr(items.frame_base) : null;
   return {
     vars,
@@ -155,7 +156,7 @@ function filterScopes(
           const s: FoundScope = {
             id: item.linkage_name,
             name: item.name,
-            variables: getVariables(item, pc),
+            variables: getVariables(item, pc)
           };
           result = [...result, s, ...filterScopes(item.children, pc, s, index)];
         }
@@ -166,7 +167,7 @@ function filterScopes(
           const s: FoundScope = {
             id: item.abstract_origin,
             name: linkedItem ? linkedItem.name : void 0,
-            variables: getVariables(item, pc),
+            variables: getVariables(item, pc)
           };
           if (lastItem) {
             lastItem.file = item.call_file;

@@ -4,7 +4,11 @@
 
 // @flow
 
-import { getCurrentThread, getSelectedFrameId, getSource } from "../../selectors";
+import {
+  getCurrentThread,
+  getSelectedFrameId,
+  getSource
+} from "../../selectors";
 import { loadSourceText } from "../sources/loadSourceText";
 import { PROMISE } from "../utils/middleware/promise";
 
@@ -33,7 +37,10 @@ export async function buildOriginalScopes(
   const frameBase = frame.originalVariables.frameBase;
   const inputs = [];
   for (let i = 0; i < frame.originalVariables.vars.length; i++) {
-    const expr = (frame.originalVariables.vars[i].expr || "void 0").replace(/\bfp\(\)/g, frameBase);
+    const expr = (frame.originalVariables.vars[i].expr || "void 0").replace(
+      /\bfp\(\)/g,
+      frameBase
+    );
     inputs[i] = expr;
   }
   const results = await client.evaluateExpressions(inputs, {
@@ -43,12 +50,12 @@ export async function buildOriginalScopes(
 
   const variables = {};
   for (let i = 0; i < frame.originalVariables.vars.length; i++) {
-    const name = frame.originalVariables.vars[i].name
+    const name = frame.originalVariables.vars[i].name;
     variables[name] = { value: results[i].result };
   }
   const bindings = {
     arguments: [],
-    variables,
+    variables
   };
   const scope = {
     type: "function",
@@ -60,7 +67,7 @@ export async function buildOriginalScopes(
   };
   return {
     mappings: {},
-    scope,
+    scope
   };
 }
 
