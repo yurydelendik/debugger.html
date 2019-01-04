@@ -52,6 +52,7 @@ export async function buildOriginalScopes(
   for (let i = 0; i < frame.originalVariables.vars.length; i++) {
     const name = frame.originalVariables.vars[i].name;
     variables[name] = { value: results[i].result };
+    console.log("!Variable", name, inputs[i]);
   }
   const bindings = {
     arguments: [],
