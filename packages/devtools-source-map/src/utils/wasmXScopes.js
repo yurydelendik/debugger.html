@@ -102,9 +102,9 @@ function decodeExprAt(expr: EncodedExpr, pc: number): ?Expr {
   return foundAt ? decodeExpr(foundAt.expr) : null;
 }
 
-function getVariables(items: XScopeItem[], pc: number): XScopeVariables {
-  const vars = items.children
-    ? items.children.reduce((result, item) => {
+function getVariables(scope: XScopeItem, pc: number): XScopeVariables {
+  const vars = scope.children
+    ? scope.children.reduce((result, item) => {
         switch (item.tag) {
           case "variable":
           case "formal_parameter":
@@ -113,11 +113,16 @@ function getVariables(items: XScopeItem[], pc: number): XScopeVariables {
               expr: item.location ? decodeExprAt(item.location, pc) : null
             });
             break;
+          case "lexical_block":
+            // FIXME build scope blocks (instead of combining)
+            const tmp = getVariables(item, pc);
+            result = [...tmp.vars, ...result];
+            break;
         }
         return result;
       }, [])
     : [];
-  const frameBase = items.frame_base ? decodeExpr(items.frame_base) : null;
+  const frameBase = scope.frame_base ? decodeExpr(scope.frame_base) : null;
   return {
     vars,
     frameBase
@@ -174,6 +179,10 @@ function filterScopes(
             lastItem.line = item.call_line;
           }
           result = [...result, s, ...filterScopes(item.children, pc, s, index)];
+        }
+        break;
+      case "lexical_block":
+        if (isInRange(item, pc)) {
         }
         break;
     }
